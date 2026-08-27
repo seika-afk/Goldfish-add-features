@@ -89,3 +89,7 @@ if __name__ == '__main__':
         watch()
     except KeyboardInterrupt:
         pass
+
+
+#save locally for about 50 context switches (and if user uses goldfish )
+#  it uses this context and the context at the time user presses on screen , then  answers
