@@ -20,7 +20,7 @@ def clean_text(text):
 
 
 def get_control_text(control):
-    """Pull actual content (not just the accessible label) from a control."""
+
     texts = []
     value = None
     try:
@@ -42,9 +42,6 @@ def get_control_text(control):
 
 
 def get_identity(control):
-    """Best-effort unique key for this control, to detect real focus changes
-    (Name+ControlType alone collide when two similar controls are focused
-    back-to-back, e.g. two EditControls named the same thing)."""
     try:
         runtime_id = control.GetRuntimeId()
     except Exception:
@@ -60,8 +57,7 @@ def describe(control):
     except Exception:
         pass
     if not control.Name and not texts and not automation_id:
-        return  # empty structural noise, e.g. Chrome_WidgetWin_1 pane mid-navigation
-
+        return
     save(f'Name: {control.Name}')
     save(f'ClassName: {control.ClassName}')
     save(f'ControlType: {control.ControlTypeName}')
