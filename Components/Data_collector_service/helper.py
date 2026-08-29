@@ -1,7 +1,8 @@
 import requests
 import json
 from PROMPT import SYSTEM_PROMPT
-OPENROUTER_API_KEY = ""
+import os
+OPENROUTER_API_KEY =os.environ["OPENROUTER_API_KEY"]
 
 
 
