@@ -1,97 +1,89 @@
-import re
-import time
+import keyboard
 import uiautomation as auto
-from helper import execute_save2db_and_delete
+from Data_collector_service.event_drive_reader import get_control_text, clean_text
+import asyncio
+import json
 
-OBJ_REPLACEMENT_RUN = re.compile(r'(\ufffc\s*){2,}')  # icon-only buttons, no label
-MAX_LIM=25
-counter=0
+from agent import call_agent
 
+def get_active_window_content(control, texts=None):
+    """Recursively walk every child of the window and collect text."""
+    if texts is None:
+        texts = []
 
-def save(text):
-    with open("log.txt","a",encoding="utf-8")as f:
-        f.write(text)
-        f.write("\n")
+    control_texts = get_control_text(control)
+    name = control.Name
+    automation_id = getattr(control, "AutomationId", "")
 
+    if control_texts or name or automation_id:
+        texts.append({
+            "name": name,
+            "class_name": control.ClassName,
+            "control_type": control.ControlTypeName,
+            "automation_id": automation_id,
+            "content": control_texts,
+        })
 
-def clean_text(text):
-    if not text:
-        return text
-    return OBJ_REPLACEMENT_RUN.sub('', text).strip()
-
-
-def get_control_text(control):
-
-    texts = []
-    value = None
     try:
-        vp = control.GetValuePattern()
-        if vp and vp.Value:
-            value = vp.Value
-            texts.append(value)
+        for child in control.GetChildren():
+            get_active_window_content(child, texts)
     except Exception:
         pass
+
+    return texts
+
+def get_current_context():
+    focused = auto.GetFocusedControl()
+    if not focused:
+        return None
+
     try:
-        tp = control.GetTextPattern()
-        if tp:
-            content = tp.DocumentRange.GetText(-1)
-            if content and content != value:  # TextPattern often mirrors ValuePattern
-                texts.append(content)
+        window = focused.GetTopLevelControl()
     except Exception:
-        pass
-    return [t for t in (clean_text(t) for t in texts) if t]
+        window = focused
 
+    window_content = get_active_window_content(window)
 
-def get_identity(control):
+    context = {
+        "focused_name": focused.Name,
+        "focused_class_name": focused.ClassName,
+        "focused_control_type": focused.ControlTypeName,
+        "focused_automation_id": getattr(focused, "AutomationId", ""),
+        "focused_content": get_control_text(focused),
+        "window_content": window_content,
+        "control_ref": focused,  # keep a live reference so we can type into it later
+    }
+    return context
+
+def ctx_to_string(ctx):
+    serializable = {k: v for k, v in ctx.items() if k != "control_ref"}
+    return json.dumps(serializable, ensure_ascii=False, indent=2)
+
+def type_into_control(control, text):
     try:
-        runtime_id = control.GetRuntimeId()
-    except Exception:
-        runtime_id = None
-    return (runtime_id, control.Name, control.ControlTypeName, control.ClassName)
+        control.SendKeys(text, interval=0.01)
+    except Exception as e:
+        print(f"Failed to send keys: {e}")
 
-
-def describe(control):
-    global counter
-    texts = get_control_text(control)
-    automation_id = ''
-    try:
-        automation_id = control.AutomationId
-    except Exception:
-        pass
-    if not control.Name and not texts and not automation_id:
+async def on_hotkey():
+    ctx = get_current_context()
+    if not ctx:
+        print("No focused control found.")
         return
-    save(f'Name: {control.Name}')
-    save(f'ClassName: {control.ClassName}')
-    save(f'ControlType: {control.ControlTypeName}')
-    save(f'AutomationId: {automation_id}')
-    counter+=1
-    for t in texts:
-        if t != control.Name:
-            save(f'Content: {t}')
-    save('---')
-    if counter>MAX_LIM:
-        success = execute_save2db_and_delete()
-        if success:
-            counter = 0
 
-def watch(poll_seconds=0.3):
-    last_identity = None
-    while True:
-        control = auto.GetFocusedControl()
-        if control:
-            identity = get_identity(control)
-            if identity != last_identity:
-                describe(control)
-                last_identity = identity
-        time.sleep(poll_seconds)
+    print("Captured focused control:", ctx["focused_name"], ctx["focused_control_type"])
+    print(f"Collected {len(ctx['window_content'])} elements from window")
 
+    answer = await call_agent(ctx_to_string(ctx))
 
-if __name__ == '__main__':
-    try:
-        watch()
-    except KeyboardInterrupt:
-        pass
+    type_into_control(ctx["control_ref"], answer)
 
+def on_hotkey_sync():
+    asyncio.run(on_hotkey())
 
-#save locally for about 25 context switches (and if user uses goldfish )
-#  it uses this context and the context at the time user presses on screen , then  answers
+keyboard.add_hotkey('right alt', on_hotkey_sync)
+
+try:
+    keyboard.wait()
+except KeyboardInterrupt:
+    print("\nStopped listening.")
