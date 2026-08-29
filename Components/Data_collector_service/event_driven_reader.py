@@ -1,10 +1,11 @@
 import re
 import time
 import uiautomation as auto
-
+from helper import execute_save2db_and_delete
 
 OBJ_REPLACEMENT_RUN = re.compile(r'(\ufffc\s*){2,}')  # icon-only buttons, no label
-
+MAX_LIM=25
+counter=0
 
 
 def save(text):
@@ -50,6 +51,7 @@ def get_identity(control):
 
 
 def describe(control):
+    global counter
     texts = get_control_text(control)
     automation_id = ''
     try:
@@ -62,11 +64,15 @@ def describe(control):
     save(f'ClassName: {control.ClassName}')
     save(f'ControlType: {control.ControlTypeName}')
     save(f'AutomationId: {automation_id}')
+    counter+=1
     for t in texts:
         if t != control.Name:
             save(f'Content: {t}')
     save('---')
-
+    if counter>MAX_LIM:
+        success = execute_save2db_and_delete()
+        if success:
+            counter = 0
 
 def watch(poll_seconds=0.3):
     last_identity = None
