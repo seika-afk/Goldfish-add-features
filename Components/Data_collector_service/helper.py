@@ -2,8 +2,11 @@ import requests
 import json
 from PROMPT import SYSTEM_PROMPT
 import os
-OPENROUTER_API_KEY =os.environ["OPENROUTER_API_KEY"]
+from dotenv import load_dotenv
+load_dotenv()
 
+
+OPENROUTER_API_KEY =os.environ["OPENROUTER_API_KEY"]
 
 
 def get_structured_entry(raw_text: str):
