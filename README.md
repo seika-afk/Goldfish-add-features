@@ -1,6 +1,6 @@
 # Additional features for Goldfish
 TODO :
-- [ ] Complete Workflow Test
-- [ ] Add features
+- [x] Complete Workflow Test
+- [x] Add features
 - [ ] F1 - Multi goldfishes
 - [ ] pitch 
